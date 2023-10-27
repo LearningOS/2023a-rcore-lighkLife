@@ -153,6 +153,34 @@ impl TaskManager {
             panic!("All applications completed!");
         }
     }
+
+    /// increase syscall
+    fn inc_syscall(&self, id: usize) {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        inner.tasks[current].syscall_times[id] += 1;
+    }
+
+    /// get current task status
+    fn current_task_status(&self) -> TaskStatus {
+        let inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        inner.tasks[current].task_status
+    }
+
+    /// get current task time
+    fn current_task_time(&self) -> usize {
+        let inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        get_time_ms() - inner.tasks[current].start_time
+    }
+
+    /// copy current_task_sys_call_times
+    fn current_task_sys_call_times(&self, syscall_times: &mut[u32; MAX_SYSCALL_NUM]) {
+        let inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        syscall_times.clone_from_slice(&inner.tasks[current].syscall_times)
+    }
 }
 
 /// Run the first task in task list.
@@ -186,6 +214,26 @@ pub fn suspend_current_and_run_next() {
 pub fn exit_current_and_run_next() {
     mark_current_exited();
     run_next_task();
+}
+
+/// record the sys_call times
+pub fn inc_syscall_times(id: usize) {
+    TASK_MANAGER.inc_syscall(id);
+}
+
+/// get current task state
+pub fn current_task_status() -> TaskStatus {
+    TASK_MANAGER.current_task_status()
+}
+
+/// get current task running time
+pub fn current_task_time() -> usize {
+    TASK_MANAGER.current_task_time()
+}
+
+/// get current task sys_call times
+pub fn current_task_sys_call_times(syscall_times: &mut [u32; MAX_SYSCALL_NUM]) {
+    TASK_MANAGER.current_task_sys_call_times(syscall_times);
 }
 
 /// Get the current 'Running' task's token.

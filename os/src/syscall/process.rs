@@ -15,6 +15,7 @@ pub struct TimeVal {
 
 /// Task information
 #[allow(dead_code)]
+#[derive(Debug)]
 pub struct TaskInfo {
     /// Task status in it's life cycle
     status: TaskStatus,
@@ -43,15 +44,28 @@ pub fn sys_yield() -> isize {
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
 pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
     trace!("kernel: sys_get_time");
-    -1
+    let us = get_time_us();
+    unsafe {
+        *ts = TimeVal {
+            sec: us / 1_000_000,
+            usec: us % 1_000_000,
+        };
+    }
+    0
 }
 
 /// YOUR JOB: Finish sys_task_info to pass testcases
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TaskInfo`] is splitted by two pages ?
 pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
-    trace!("kernel: sys_task_info NOT IMPLEMENTED YET!");
-    -1
+    trace!("kernel: sys_task_info");
+    unsafe {
+        (*_ti).status = current_task_status();
+        (*_ti).time = current_task_time();
+        current_task_sys_call_times(&mut (*_ti).syscall_times);
+        println!("{:?}", *_ti);
+    }
+    0
 }
 
 // YOUR JOB: Implement mmap.
