@@ -163,7 +163,7 @@ impl TaskManager {
     fn current_task_time(&self) -> usize {
         let inner = self.inner.exclusive_access();
         let current = inner.current_task;
-        inner.tasks[current].start_time - get_time_ms()
+        get_time_ms() - inner.tasks[current].start_time
     }
 
     /// copy current_task_sys_call_times

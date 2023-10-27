@@ -15,6 +15,7 @@ pub struct TimeVal {
 
 /// Task information
 #[allow(dead_code)]
+#[derive(Debug)]
 pub struct TaskInfo {
     /// Task status in it's life cycle
     status: TaskStatus,
@@ -58,6 +59,7 @@ pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
         (*_ti).status = current_task_status();
         (*_ti).time = current_task_time();
         current_task_sys_call_times(&mut (*_ti).syscall_times);
+        println!("{:?}", *_ti);
     }
     0
 }
