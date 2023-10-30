@@ -9,20 +9,25 @@
 //! Be careful when you see `__switch` ASM function in `switch.S`. Control flow around this function
 //! might not be what you expect.
 
+use alloc::vec::Vec;
+
+use lazy_static::*;
+
+pub use context::TaskContext;
+use switch::__switch;
+pub use task::{TaskControlBlock, TaskStatus};
+
+use crate::config::MAX_SYSCALL_NUM;
+use crate::loader::{get_app_data, get_num_app};
+use crate::mm::{MapPermission, PhysPageNum, VirtAddr, VirtPageNum};
+use crate::sync::UPSafeCell;
+use crate::timer::get_time_us;
+use crate::trap::TrapContext;
+
 mod context;
 mod switch;
 #[allow(clippy::module_inception)]
 mod task;
-
-use crate::loader::{get_app_data, get_num_app};
-use crate::sync::UPSafeCell;
-use crate::trap::TrapContext;
-use alloc::vec::Vec;
-use lazy_static::*;
-use switch::__switch;
-pub use task::{TaskControlBlock, TaskStatus};
-
-pub use context::TaskContext;
 
 /// The task manager, where all the tasks are managed.
 ///
@@ -79,6 +84,9 @@ impl TaskManager {
         let mut inner = self.inner.exclusive_access();
         let next_task = &mut inner.tasks[0];
         next_task.task_status = TaskStatus::Running;
+        if next_task.start_time == 0 {
+            next_task.start_time = get_time_us();
+        }
         let next_task_cx_ptr = &next_task.task_cx as *const TaskContext;
         drop(inner);
         let mut _unused = TaskContext::zero_init();
@@ -111,7 +119,9 @@ impl TaskManager {
         let current = inner.current_task;
         (current + 1..current + self.num_app + 1)
             .map(|id| id % self.num_app)
-            .find(|id| inner.tasks[*id].task_status == TaskStatus::Ready)
+            .find(|id| {
+                inner.tasks[*id].task_status == TaskStatus::Ready
+            })
     }
 
     /// Get the current 'Running' task's token.
@@ -140,6 +150,9 @@ impl TaskManager {
             let mut inner = self.inner.exclusive_access();
             let current = inner.current_task;
             inner.tasks[next].task_status = TaskStatus::Running;
+            if inner.tasks[next].start_time == 0 {
+                inner.tasks[next].start_time = get_time_us();
+            }
             inner.current_task = next;
             let current_task_cx_ptr = &mut inner.tasks[current].task_cx as *mut TaskContext;
             let next_task_cx_ptr = &inner.tasks[next].task_cx as *const TaskContext;
@@ -154,11 +167,11 @@ impl TaskManager {
         }
     }
 
-    /// increase syscall
-    fn inc_syscall(&self, id: usize) {
+    /// increase syscall count
+    fn inc_syscall(&self, syscall_id: usize) {
         let mut inner = self.inner.exclusive_access();
         let current = inner.current_task;
-        inner.tasks[current].syscall_times[id] += 1;
+        inner.tasks[current].syscall_times[syscall_id] += 1;
     }
 
     /// get current task status
@@ -172,14 +185,30 @@ impl TaskManager {
     fn current_task_time(&self) -> usize {
         let inner = self.inner.exclusive_access();
         let current = inner.current_task;
-        get_time_ms() - inner.tasks[current].start_time
+        get_time_us() - inner.tasks[current].start_time
     }
 
     /// copy current_task_sys_call_times
-    fn current_task_sys_call_times(&self, syscall_times: &mut[u32; MAX_SYSCALL_NUM]) {
+    fn current_task_sys_call_times(&self, syscall_times: &mut [u32; MAX_SYSCALL_NUM]) {
         let inner = self.inner.exclusive_access();
         let current = inner.current_task;
         syscall_times.clone_from_slice(&inner.tasks[current].syscall_times)
+    }
+
+    /// Translate current 'Running' task's page number from virtual to Physical
+    fn translate(&self, vpn: VirtPageNum) -> Option<PhysPageNum> {
+        let inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        return inner.tasks[current].memory_set
+            .translate(vpn)
+            .map(|it| it.ppn());
+    }
+
+    /// allocate memory from start to end
+    fn alloc(&self, start: VirtAddr, end: VirtAddr, permission: MapPermission) -> isize {
+        let mut inner = self.inner.exclusive_access();
+        let cur = inner.current_task;
+        inner.tasks[cur].alloc(start, end, permission)
     }
 }
 
@@ -217,8 +246,8 @@ pub fn exit_current_and_run_next() {
 }
 
 /// record the sys_call times
-pub fn inc_syscall_times(id: usize) {
-    TASK_MANAGER.inc_syscall(id);
+pub fn inc_syscall_times(syscall_id: usize) {
+    TASK_MANAGER.inc_syscall(syscall_id);
 }
 
 /// get current task state
@@ -249,4 +278,15 @@ pub fn current_trap_cx() -> &'static mut TrapContext {
 /// Change the current 'Running' task's program break
 pub fn change_program_brk(size: i32) -> Option<usize> {
     TASK_MANAGER.change_current_program_brk(size)
+}
+
+
+/// Translate current 'Running' task's page number from virtual to Physical
+pub fn translate(vpn: VirtPageNum) -> Option<PhysPageNum> {
+    TASK_MANAGER.translate(vpn)
+}
+
+/// alloc memory
+pub fn alloc(start: VirtAddr, end: VirtAddr, permission: MapPermission) -> isize {
+    TASK_MANAGER.alloc(start, end, permission)
 }

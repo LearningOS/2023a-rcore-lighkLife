@@ -1,6 +1,6 @@
 //! Types related to task management
 use super::TaskContext;
-use crate::config::TRAP_CONTEXT_BASE;
+use crate::config::{MAX_SYSCALL_NUM, TRAP_CONTEXT_BASE};
 use crate::mm::{
     kernel_stack_position, MapPermission, MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE,
 };
@@ -28,6 +28,12 @@ pub struct TaskControlBlock {
 
     /// Program break
     pub program_brk: usize,
+
+    /// task start time(microseconds)
+    pub start_time: usize,
+
+    ///  syscall statistic
+    pub syscall_times: [u32; MAX_SYSCALL_NUM],
 }
 
 impl TaskControlBlock {
@@ -63,6 +69,8 @@ impl TaskControlBlock {
             base_size: user_sp,
             heap_bottom: user_sp,
             program_brk: user_sp,
+            start_time: 0,
+            syscall_times: [0; MAX_SYSCALL_NUM],
         };
         // prepare TrapContext in user space
         let trap_cx = task_control_block.get_trap_cx();
@@ -96,9 +104,22 @@ impl TaskControlBlock {
             None
         }
     }
+
+    /// alloc memory
+    pub fn alloc(&mut self, start: VirtAddr, end: VirtAddr, permission: MapPermission) -> isize {
+        if self.memory_set.has_conflict(start, end)  {
+            return -1;
+        }
+        debug!("[kernel] alloc [{:?}, {:?}], {:?}", start, end, permission);
+        debug!("[kernel] before {:?}", self.memory_set);
+        self.memory_set.insert_framed_area(start, end, permission);
+        self.memory_set.append_to(start, end);
+        debug!("[kernel] after {:?}", self.memory_set);
+        return 0;
+    }
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Debug, Clone, PartialEq)]
 /// task status: UnInit, Ready, Running, Exited
 pub enum TaskStatus {
     /// uninitialized

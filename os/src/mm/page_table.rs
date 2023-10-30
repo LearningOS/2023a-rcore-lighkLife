@@ -65,6 +65,7 @@ impl PageTableEntry {
 }
 
 /// page table structure
+#[derive(Debug)]
 pub struct PageTable {
     root_ppn: PhysPageNum,
     frames: Vec<FrameTracker>,
@@ -92,6 +93,7 @@ impl PageTable {
         let idxs = vpn.indexes();
         let mut ppn = self.root_ppn;
         let mut result: Option<&mut PageTableEntry> = None;
+        debug!("[kernel] find_pte_create vpn={:?}", vpn);
         for (i, idx) in idxs.iter().enumerate() {
             let pte = &mut ppn.get_pte_array()[*idx];
             if i == 2 {

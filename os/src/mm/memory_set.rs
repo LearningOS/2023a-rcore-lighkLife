@@ -34,6 +34,7 @@ lazy_static! {
         Arc::new(unsafe { UPSafeCell::new(MemorySet::new_kernel()) });
 }
 /// address space
+#[derive(Debug)]
 pub struct MemorySet {
     page_table: PageTable,
     areas: Vec<MapArea>,
@@ -51,6 +52,17 @@ impl MemorySet {
     pub fn token(&self) -> usize {
         self.page_table.token()
     }
+
+    /// has conflict
+    pub fn has_conflict(&self, start: VirtAddr, end: VirtAddr) -> bool{
+        self.areas.iter()
+            .find(|area|
+                start.floor() >= area.vpn_range.get_start() && start.floor() < area.vpn_range.get_end()
+                || end.ceil() >= area.vpn_range.get_start() && end.ceil() < area.vpn_range.get_end()
+            )
+            .is_some()
+    }
+
     /// Assume that no conflicts.
     pub fn insert_framed_area(
         &mut self,
@@ -263,7 +275,9 @@ impl MemorySet {
         }
     }
 }
+
 /// map area structure, controls a contiguous piece of virtual memory
+#[derive(Debug)]
 pub struct MapArea {
     vpn_range: VPNRange,
     data_frames: BTreeMap<VirtPageNum, FrameTracker>,
@@ -296,6 +310,7 @@ impl MapArea {
             MapType::Framed => {
                 let frame = frame_alloc().unwrap();
                 ppn = frame.ppn;
+                debug!("[kernel] insert {:?}:{:?}", &vpn, &frame.ppn);
                 self.data_frames.insert(vpn, frame);
             }
         }

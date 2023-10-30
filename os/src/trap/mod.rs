@@ -12,20 +12,22 @@
 //! was. For example, timer interrupts trigger task preemption, and syscalls go
 //! to [`syscall()`].
 
-mod context;
-
-use crate::config::{TRAMPOLINE, TRAP_CONTEXT_BASE};
-use crate::syscall::syscall;
-use crate::task::{
-    current_trap_cx, current_user_token, exit_current_and_run_next, suspend_current_and_run_next,
-};
-use crate::timer::set_next_trigger;
 use core::arch::{asm, global_asm};
+
 use riscv::register::{
     mtvec::TrapMode,
     scause::{self, Exception, Interrupt, Trap},
     sie, stval, stvec,
 };
+
+pub use context::TrapContext;
+
+use crate::config::{TRAMPOLINE, TRAP_CONTEXT_BASE};
+use crate::syscall::syscall;
+use crate::task::{current_trap_cx, current_user_token, exit_current_and_run_next, suspend_current_and_run_next};
+use crate::timer::set_next_trigger;
+
+mod context;
 
 global_asm!(include_str!("trap.S"));
 
@@ -132,4 +134,3 @@ pub fn trap_from_kernel() -> ! {
     panic!("a trap {:?} from kernel!", scause::read().cause());
 }
 
-pub use context::TrapContext;
