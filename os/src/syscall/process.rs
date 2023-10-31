@@ -7,7 +7,7 @@ use crate::{
 };
 use crate::config::PAGE_SIZE;
 use crate::mm::{MapPermission, VirtAddr};
-use crate::task::{alloc, current_task_status, current_task_sys_call_times, current_task_time, translate};
+use crate::task::{alloc, current_task_status, current_task_sys_call_times, current_task_time, translate, unmap};
 use crate::timer::get_time_us;
 
 const MICRO_PER_SEC: usize = 1_000_000;
@@ -131,8 +131,14 @@ pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
 
 // YOUR JOB: Implement munmap.
 pub fn sys_munmap(_start: usize, _len: usize) -> isize {
-    trace!("kernel: sys_munmap NOT IMPLEMENTED YET!");
-    -1
+    trace!("kernel: sys_munmap");
+    if 0 != (_start % PAGE_SIZE) {
+        // start 没有按页大小对齐
+        return -1;
+    }
+    let start_addr = VirtAddr::from(_start);
+    let end_addr = VirtAddr::from(_start + _len);
+    unmap(start_addr, end_addr)
 }
 
 /// change data segment size

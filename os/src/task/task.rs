@@ -116,7 +116,6 @@ impl TaskControlBlock {
         // debug!("[kernel] alloc [{:?}, {:?}], {:?}", start, end, permission);
         // debug!("[kernel] before {:?}", self.memory_set);
         self.memory_set.insert_framed_area(start, end, permission);
-        self.memory_set.append_to(start, end);
         // debug!("[kernel] after {:?}", self.memory_set);
         // let pte = self.memory_set.translate(start.floor());
         // if let Some(pte) = pte {
@@ -127,6 +126,29 @@ impl TaskControlBlock {
         //     warn!("[kernel] pte is None");
         // }
         return 0;
+    }
+
+    /// unmap memory
+    pub fn unmap(&mut self, start: VirtAddr, end: VirtAddr) -> isize {
+        // println!("[kernel] alloc [{:?}, {:?}]", start, end);
+        // if self.memory_set.has_conflict(start, end) {
+        //     warn!("[kernel] has_conflict {:?}, {:?}", start, end);
+        //     return -1;
+        // }
+        // // debug!("[kernel] alloc [{:?}, {:?}], {:?}", start, end, permission);
+        // // debug!("[kernel] before {:?}", self.memory_set);
+        // self.memory_set.insert_framed_area(start, end, permission);
+        // self.memory_set.append_to(start, end);
+        // // debug!("[kernel] after {:?}", self.memory_set);
+        // // let pte = self.memory_set.translate(start.floor());
+        // // if let Some(pte) = pte {
+        // //     debug!("[kernel] pte ppn={:?}, valid={}, r={}, w={}, x={}",
+        // //         pte.ppn(), pte.is_valid(), pte.readable(), pte.writable(), pte.executable());
+        // //     debug!("[kernel] page={:?}", pte.ppn().get_bytes_array());
+        // // } else {
+        // //     warn!("[kernel] pte is None");
+        // // }
+        self.memory_set.remove_framed_area(start, end)
     }
 }
 

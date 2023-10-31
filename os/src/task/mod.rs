@@ -208,6 +208,13 @@ impl TaskManager {
         let cur = inner.current_task;
         inner.tasks[cur].alloc(start, end, permission)
     }
+
+    /// unmap memory from start to end
+    fn unmap(&self, start: VirtAddr, end: VirtAddr) -> isize {
+        let mut inner = self.inner.exclusive_access();
+        let cur = inner.current_task;
+        inner.tasks[cur].unmap(start, end)
+    }
 }
 
 /// Run the first task in task list.
@@ -287,4 +294,8 @@ pub fn translate(vpn: VirtPageNum) -> Option<PhysPageNum> {
 /// alloc memory
 pub fn alloc(start: VirtAddr, end: VirtAddr, permission: MapPermission) -> isize {
     TASK_MANAGER.alloc(start, end, permission)
+}
+/// unmap memory
+pub fn unmap(start: VirtAddr, end: VirtAddr) -> isize {
+    TASK_MANAGER.unmap(start, end)
 }
