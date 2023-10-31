@@ -54,12 +54,15 @@ impl MemorySet {
     }
 
     /// has conflict
-    pub fn has_conflict(&self, start: VirtAddr, end: VirtAddr) -> bool{
+    pub fn has_conflict(&self, start: VirtAddr, end: VirtAddr) -> bool {
         self.areas.iter()
-            .find(|area|
-                start.floor() >= area.vpn_range.get_start() && start.floor() < area.vpn_range.get_end()
-                || end.ceil() >= area.vpn_range.get_start() && end.ceil() < area.vpn_range.get_end()
-            )
+            .find(|area| (
+                start.floor().0 >= area.vpn_range.get_start().0
+                    && start.floor().0 < area.vpn_range.get_end().0
+            ) || (
+                end.floor().0 >= area.vpn_range.get_start().0 &&
+                    end.floor().0 < area.vpn_range.get_end().0
+            ))
             .is_some()
     }
 
@@ -310,7 +313,7 @@ impl MapArea {
             MapType::Framed => {
                 let frame = frame_alloc().unwrap();
                 ppn = frame.ppn;
-                debug!("[kernel] insert {:?}:{:?}", &vpn, &frame.ppn);
+                // debug!("[kernel] insert {:?}:{:?}", &vpn, &frame.ppn);
                 self.data_frames.insert(vpn, frame);
             }
         }

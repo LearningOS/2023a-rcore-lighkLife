@@ -119,9 +119,7 @@ impl TaskManager {
         let current = inner.current_task;
         (current + 1..current + self.num_app + 1)
             .map(|id| id % self.num_app)
-            .find(|id| {
-                inner.tasks[*id].task_status == TaskStatus::Ready
-            })
+            .find(|id| inner.tasks[*id].task_status == TaskStatus::Ready)
     }
 
     /// Get the current 'Running' task's token.

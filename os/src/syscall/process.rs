@@ -106,10 +106,10 @@ fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
 
 // YOUR JOB: Implement mmap.
 pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
-    trace!("kernel: sys_mmap");
     let start_addr = VirtAddr::from(_start);
     let end_addr = VirtAddr::from(_start + _len);
-    if start_addr.page_offset() != 0 {
+    // info!("kernel: sys_mmap {:?}, {:?}", start_addr, end_addr);
+    if 0 != (start_addr.0 % PAGE_SIZE) {
         // start 没有按页大小对齐
         return -1;
     }
@@ -121,7 +121,8 @@ pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
         //不能读、写、执行，这样的内存无意义
         return -1;
     }
-    let perm = MapPermission::from_bits((_port << 1) as u8);
+    let perm = MapPermission::from_bits((_port << 1 | 1 << 4) as u8);
+    debug!("perm ={:?}", perm);
     if perm.is_none() {
         return -1;
     }

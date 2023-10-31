@@ -10,6 +10,8 @@ pub struct TaskContext {
     sp: usize,
     /// s0-11 register, callee saved
     s: [usize; 12],
+    /// satp register
+    stap: usize,
 }
 
 impl TaskContext {
@@ -19,14 +21,16 @@ impl TaskContext {
             ra: 0,
             sp: 0,
             s: [0; 12],
+            stap: 0,
         }
     }
     /// Create a new task context with a trap return addr and a kernel stack pointer
-    pub fn goto_trap_return(kstack_ptr: usize) -> Self {
+    pub fn goto_trap_return(kstack_ptr: usize, stap: usize) -> Self {
         Self {
             ra: trap_return as usize,
             sp: kstack_ptr,
             s: [0; 12],
+            stap
         }
     }
 }

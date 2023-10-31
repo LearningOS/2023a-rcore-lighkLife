@@ -93,9 +93,16 @@ impl PageTable {
         let idxs = vpn.indexes();
         let mut ppn = self.root_ppn;
         let mut result: Option<&mut PageTableEntry> = None;
-        debug!("[kernel] find_pte_create vpn={:?}", vpn);
+        let mut print = false;
+        if vpn.0==0x10000 {
+            print = true;
+            // debug!("[kernel] find_pte_create root={:?}", self.root_ppn);
+        }
         for (i, idx) in idxs.iter().enumerate() {
             let pte = &mut ppn.get_pte_array()[*idx];
+            // if print {
+            //     debug!("[kernel] find_pte_create i={}, idx={:#X}, {:?} {:?}",i,  idx, pte.ppn(), pte.is_valid());
+            // }
             if i == 2 {
                 result = Some(pte);
                 break;
@@ -104,6 +111,9 @@ impl PageTable {
                 let frame = frame_alloc().unwrap();
                 *pte = PageTableEntry::new(frame.ppn, PTEFlags::V);
                 self.frames.push(frame);
+                if print {
+                    // debug!("[kernel] find_pte_create create {:?}", pte.ppn());
+                }
             }
             ppn = pte.ppn();
         }
@@ -114,8 +124,16 @@ impl PageTable {
         let idxs = vpn.indexes();
         let mut ppn = self.root_ppn;
         let mut result: Option<&mut PageTableEntry> = None;
+        let mut print = false;
+        if vpn.0==0x10000 {
+            print = true;
+            // debug!("[kernel] find_pte root={:?}", self.root_ppn);
+        }
         for (i, idx) in idxs.iter().enumerate() {
             let pte = &mut ppn.get_pte_array()[*idx];
+            if print {
+                // debug!("[kernel] find_pte_create i={}, idx={:#X}, {:?} {:?}",i,  idx, pte.ppn(), pte.is_valid());
+            }
             if i == 2 {
                 result = Some(pte);
                 break;

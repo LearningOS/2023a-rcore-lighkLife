@@ -1,5 +1,5 @@
 //! Implementation of [`TrapContext`]
-use riscv::register::sstatus::{self, Sstatus, SPP};
+use riscv::register::sstatus::{self, SPP, Sstatus};
 
 #[repr(C)]
 #[derive(Debug)]
@@ -7,15 +7,15 @@ use riscv::register::sstatus::{self, Sstatus, SPP};
 pub struct TrapContext {
     /// General-Purpose Register x0-31
     pub x: [usize; 32],
-    /// Supervisor Status Register
+    /// (32)Supervisor Status Register
     pub sstatus: Sstatus,
-    /// Supervisor Exception Program Counter
+    /// (33)Supervisor Exception Program Counter
     pub sepc: usize,
-    /// Token of kernel address space
+    /// (34)Token of kernel address space
     pub kernel_satp: usize,
-    /// Kernel stack pointer of the current application
+    /// (35)Kernel stack pointer of the current application
     pub kernel_sp: usize,
-    /// Virtual address of trap handler entry point in kernel
+    /// (36)Virtual address of trap handler entry point in kernel
     pub trap_handler: usize,
 }
 

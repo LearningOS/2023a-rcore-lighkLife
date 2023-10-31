@@ -1,10 +1,11 @@
 //! Types related to task management
-use super::TaskContext;
 use crate::config::{MAX_SYSCALL_NUM, TRAP_CONTEXT_BASE};
 use crate::mm::{
-    kernel_stack_position, MapPermission, MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE,
+    KERNEL_SPACE, kernel_stack_position, MapPermission, MemorySet, PhysPageNum, VirtAddr,
 };
 use crate::trap::{trap_handler, TrapContext};
+
+use super::TaskContext;
 
 /// The task control block (TCB) of a task.
 pub struct TaskControlBlock {
@@ -63,7 +64,7 @@ impl TaskControlBlock {
         );
         let task_control_block = Self {
             task_status,
-            task_cx: TaskContext::goto_trap_return(kernel_stack_top),
+            task_cx: TaskContext::goto_trap_return(kernel_stack_top, memory_set.token()),
             memory_set,
             trap_cx_ppn,
             base_size: user_sp,
@@ -107,14 +108,24 @@ impl TaskControlBlock {
 
     /// alloc memory
     pub fn alloc(&mut self, start: VirtAddr, end: VirtAddr, permission: MapPermission) -> isize {
-        if self.memory_set.has_conflict(start, end)  {
+        println!("[kernel] alloc [{:?}, {:?}]", start, end);
+        if self.memory_set.has_conflict(start, end) {
+            warn!("[kernel] has_conflict {:?}, {:?}", start, end);
             return -1;
         }
-        debug!("[kernel] alloc [{:?}, {:?}], {:?}", start, end, permission);
-        debug!("[kernel] before {:?}", self.memory_set);
+        // debug!("[kernel] alloc [{:?}, {:?}], {:?}", start, end, permission);
+        // debug!("[kernel] before {:?}", self.memory_set);
         self.memory_set.insert_framed_area(start, end, permission);
         self.memory_set.append_to(start, end);
-        debug!("[kernel] after {:?}", self.memory_set);
+        // debug!("[kernel] after {:?}", self.memory_set);
+        // let pte = self.memory_set.translate(start.floor());
+        // if let Some(pte) = pte {
+        //     debug!("[kernel] pte ppn={:?}, valid={}, r={}, w={}, x={}",
+        //         pte.ppn(), pte.is_valid(), pte.readable(), pte.writable(), pte.executable());
+        //     debug!("[kernel] page={:?}", pte.ppn().get_bytes_array());
+        // } else {
+        //     warn!("[kernel] pte is None");
+        // }
         return 0;
     }
 }

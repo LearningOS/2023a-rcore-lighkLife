@@ -21,7 +21,6 @@
 #![no_main]
 #![feature(panic_info_message)]
 #![feature(alloc_error_handler)]
-#![feature(let_chains)]
 
 #[macro_use]
 extern crate bitflags;
@@ -104,8 +103,8 @@ pub fn rust_main() -> ! {
     println!("[kernel] back to world!");
     mm::remap_test();
     trap::init();
-    trap::enable_timer_interrupt();
-    timer::set_next_trigger();
+    // trap::enable_timer_interrupt();
+    // timer::set_next_trigger();
     task::run_first_task();
     panic!("Unreachable in rust_main!");
 }

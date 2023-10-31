@@ -28,6 +28,10 @@ __switch:
         LOAD_SN %n
         .set n, n + 1
     .endr
+    # switch to next task page-table
+    #ld t0, n*8(a1)
+    #csrw satp, t0
+    #sfence.vma
     # restore kernel stack of next task
     ld sp, 8(a1)
     ret
