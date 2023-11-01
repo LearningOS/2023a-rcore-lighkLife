@@ -300,6 +300,49 @@ impl MemorySet {
             false
         }
     }
+
+    /// has conflict with other MapArea
+    pub fn has_conflict(&self, start: VirtAddr, end: VirtAddr) -> bool {
+        self.areas.iter()
+            .find(|area| (
+                start.floor().0 >= area.vpn_range.get_start().0
+                    && start.floor().0 < area.vpn_range.get_end().0
+            ) || (
+                end.floor().0 >= area.vpn_range.get_start().0 &&
+                    end.floor().0 < area.vpn_range.get_end().0
+            ))
+            .is_some()
+    }
+
+    /// map [start, ceil(end)]
+    /// return 0 if success
+    /// return -1 if failed
+    pub fn mmap(&mut self, start: VirtAddr, end: VirtAddr, permission: MapPermission) -> isize {
+        if self.has_conflict(start, end) {
+            warn!("[kernel] has_conflict {:?}, {:?}", start, end);
+            return -1;
+        }
+        self.insert_framed_area(start, end, permission);
+        return 0;
+    }
+
+    /// unmap [start,ceil(end)]
+    /// return 0 if success
+    /// return -1 if failed
+    pub fn unmmap(&mut self, start_va: VirtAddr, end_va: VirtAddr) -> isize{
+        let position = self.areas.iter()
+            .position(|area|
+                area.vpn_range.get_start() == start_va.floor()
+                    &&  area.vpn_range.get_end() == end_va.ceil()
+            );
+        return if let Some(index) = position {
+            self.areas.remove(index);
+            self.page_table.unmap(start_va.floor());
+            0
+        } else {
+            -1
+        }
+    }
 }
 /// map area structure, controls a contiguous piece of virtual memory
 pub struct MapArea {

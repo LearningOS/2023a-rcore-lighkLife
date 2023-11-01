@@ -10,6 +10,9 @@ use crate::{
         suspend_current_and_run_next, TaskStatus,
     },
 };
+use crate::config::PAGE_SIZE;
+use crate::mm::{MapPermission, VirtAddr};
+use crate::timer::{get_time_us, MICRO_PER_MILLISECONDS, MICRO_PER_SEC};
 
 #[repr(C)]
 #[derive(Debug)]
@@ -122,7 +125,42 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
         "kernel:pid[{}] sys_get_time NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    let us = get_time_us();
+    let time_val = TimeVal {
+        sec: us / MICRO_PER_SEC,
+        usec: us % MICRO_PER_SEC,
+    };
+
+    let virt_addr = VirtAddr::from(_ts as *const usize as usize);
+    write(virt_addr, time_val);
+    0
+}
+
+/// write value to the virtual address
+fn write<T: Sized>(virt_addr: VirtAddr, value: T) {
+    let task =  current_task().unwrap();
+    let task = task.inner_exclusive_access();
+    let ppn = task.memory_set.translate(virt_addr.floor()).unwrap();
+    let page = ppn.ppn().get_bytes_array();
+
+    let offset = virt_addr.page_offset();
+    let bytes = any_as_u8_slice(&value);
+    if offset + bytes.len() > PAGE_SIZE {
+        //todo
+        // find next page and write to it
+        error!("split by two pages");
+    }
+    page[offset..offset + bytes.len()].copy_from_slice(&bytes);
+}
+
+/// convert any type value to [u8]
+fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
+    unsafe {
+        core::slice::from_raw_parts(
+            (p as *const T) as *const u8,
+            ::core::mem::size_of::<T>(),
+        )
+    }
 }
 
 /// YOUR JOB: Finish sys_task_info to pass testcases
@@ -130,10 +168,21 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
 /// HINT: What if [`TaskInfo`] is splitted by two pages ?
 pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
     trace!(
-        "kernel:pid[{}] sys_task_info NOT IMPLEMENTED",
+        "kernel:pid[{}] sys_task_info",
         current_task().unwrap().pid.0
     );
-    -1
+    let task =  current_task().unwrap();
+    let task = task.inner_exclusive_access();    let syscall_times = &mut [0; MAX_SYSCALL_NUM];
+    syscall_times.copy_from_slice(task.get_syscall_times());
+    let info = TaskInfo {
+        status: task.get_status(),
+        syscall_times: *syscall_times,
+        time: task.get_time() / MICRO_PER_MILLISECONDS,
+    };
+
+    let addr = VirtAddr::from(_ti as *const usize as usize);
+    write(addr, info);
+    0
 }
 
 /// YOUR JOB: Implement mmap.
@@ -142,7 +191,28 @@ pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
         "kernel:pid[{}] sys_mmap NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    let start_addr = VirtAddr::from(_start);
+    let end_addr = VirtAddr::from(_start + _len);
+    // info!("kernel: sys_mmap {:?}, {:?}", start_addr, end_addr);
+    if 0 != (start_addr.0 % PAGE_SIZE) {
+        // start 没有按页大小对齐
+        return -1;
+    }
+    if _port & !0x7 != 0 {
+        //port 其余位必须为0
+        return -1;
+    }
+    if _port & 0x7 == 0 {
+        //不能读、写、执行，这样的内存无意义
+        return -1;
+    }
+    let perm = MapPermission::from_bits((_port << 1 | 1 << 4) as u8);
+    if perm.is_none() {
+        return -1;
+    }
+    let task =  current_task().unwrap();
+    let mut task = task.inner_exclusive_access();
+    task.memory_set.mmap(start_addr, end_addr, perm.unwrap())
 }
 
 /// YOUR JOB: Implement munmap.
@@ -151,7 +221,15 @@ pub fn sys_munmap(_start: usize, _len: usize) -> isize {
         "kernel:pid[{}] sys_munmap NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    if 0 != (_start % PAGE_SIZE) {
+        // start 没有按页大小对齐
+        return -1;
+    }
+    let start_addr = VirtAddr::from(_start);
+    let end_addr = VirtAddr::from(_start + _len);
+    let task =  current_task().unwrap();
+    let mut task = task.inner_exclusive_access();
+    task.memory_set.unmmap(start_addr, end_addr)
 }
 
 /// change data segment size
