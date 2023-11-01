@@ -122,7 +122,7 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
 pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
     trace!(
-        "kernel:pid[{}] sys_get_time NOT IMPLEMENTED",
+        "kernel:pid[{}] sys_get_time",
         current_task().unwrap().pid.0
     );
     let us = get_time_us();
@@ -172,7 +172,8 @@ pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
         current_task().unwrap().pid.0
     );
     let task =  current_task().unwrap();
-    let task = task.inner_exclusive_access();    let syscall_times = &mut [0; MAX_SYSCALL_NUM];
+    let task = task.inner_exclusive_access();
+    let syscall_times = &mut [0; MAX_SYSCALL_NUM];
     syscall_times.copy_from_slice(task.get_syscall_times());
     let info = TaskInfo {
         status: task.get_status(),
@@ -246,10 +247,18 @@ pub fn sys_sbrk(size: i32) -> isize {
 /// HINT: fork + exec =/= spawn
 pub fn sys_spawn(_path: *const u8) -> isize {
     trace!(
-        "kernel:pid[{}] sys_spawn NOT IMPLEMENTED",
+        "kernel:pid[{}] sys_spawn",
         current_task().unwrap().pid.0
     );
-    -1
+    let token = current_user_token();
+    let path = translated_str(token, _path);
+    if let Some(elf_data) = get_app_data_by_name(path.as_str()) {
+        let current_task = current_task().unwrap();
+        current_task.spawn(elf_data)
+    } else {
+        //无效的文件名
+        -1
+    }
 }
 
 // YOUR JOB: Set task priority.
@@ -258,5 +267,9 @@ pub fn sys_set_priority(_prio: isize) -> isize {
         "kernel:pid[{}] sys_set_priority NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    if _prio < 2 {
+        return -1;
+    }
+    current_task().unwrap().change_priority(_prio as u32);
+    _prio
 }

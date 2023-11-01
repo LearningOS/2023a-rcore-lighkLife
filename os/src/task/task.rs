@@ -1,14 +1,18 @@
 //! Types related to task management & Functions for completely changing TCB
-use super::TaskContext;
-use super::{kstack_alloc, pid_alloc, KernelStack, PidHandle};
-use crate::config::{MAX_SYSCALL_NUM, TRAP_CONTEXT_BASE};
-use crate::mm::{MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE};
-use crate::sync::UPSafeCell;
-use crate::trap::{trap_handler, TrapContext};
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use core::cell::RefMut;
+use core::cmp::Ordering;
+use core::cmp::Ordering::{Equal, Greater, Less};
+
+use crate::config::{BIG_STRIDE, DEFAULT_PASS, MAX_SYSCALL_NUM, TRAP_CONTEXT_BASE};
+use crate::mm::{KERNEL_SPACE, MemorySet, PhysPageNum, VirtAddr};
+use crate::sync::UPSafeCell;
 use crate::timer::get_time_us;
+use crate::trap::{trap_handler, TrapContext};
+
+use super::{add_task, TaskContext};
+use super::{KernelStack, kstack_alloc, pid_alloc, PidHandle};
 
 /// Task control block structure
 ///
@@ -75,6 +79,33 @@ pub struct TaskControlBlockInner {
 
     ///  syscall statistic
     pub syscall_times: [u32; MAX_SYSCALL_NUM],
+
+    /// 当前已经运行的“长度”
+    pub stride: Stride,
+    /// 进程在调度后，stride 需要进行的累加值
+    pub pass: u32,
+}
+
+#[derive(Ord, Eq, Copy, Clone, Debug)]
+pub struct Stride(u32);
+
+impl PartialOrd for Stride {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        let diff = (self.0 as i32 - other.0 as i32) as u32;
+        return if diff == 0 {
+            Some(Equal)
+        } else if diff > 0 {
+            Some(Less)
+        } else {
+            Some(Greater)
+        };
+    }
+}
+
+impl PartialEq for Stride {
+    fn eq(&self, _: &Self) -> bool {
+        false
+    }
 }
 
 impl TaskControlBlockInner {
@@ -100,6 +131,7 @@ impl TaskControlBlockInner {
         self.get_status() == TaskStatus::Zombie
     }
 }
+
 
 impl TaskControlBlock {
     /// Create a new process
@@ -133,7 +165,9 @@ impl TaskControlBlock {
                     heap_bottom: user_sp,
                     program_brk: user_sp,
                     syscall_times: [0; MAX_SYSCALL_NUM],
-                    start_time: get_time_us(),
+                    start_time: 0,
+                    stride: Stride(0),
+                    pass: DEFAULT_PASS,
                 })
             },
         };
@@ -178,6 +212,58 @@ impl TaskControlBlock {
         // **** release inner automatically
     }
 
+    /// fork a process and execute it
+    pub fn spawn(&self, elf_data: &[u8]) -> isize {
+        // ---- access parent PCB exclusively
+        let mut parent_inner = self.inner_exclusive_access();
+        // copy user space(include trap context)
+        let (memory_set, user_sp, entry_point) = MemorySet::from_elf(elf_data);
+        let trap_cx_ppn = memory_set
+            .translate(VirtAddr::from(TRAP_CONTEXT_BASE).into())
+            .unwrap()
+            .ppn();
+        // alloc a pid and a kernel stack in kernel space
+        let pid_handle = pid_alloc();
+        let kernel_stack = kstack_alloc();
+        let kernel_stack_top = kernel_stack.get_top();
+        let new_task = Arc::new(TaskControlBlock {
+            pid: pid_handle,
+            kernel_stack,
+            inner: unsafe {
+                UPSafeCell::new(TaskControlBlockInner {
+                    trap_cx_ppn,
+                    base_size: user_sp,
+                    task_cx: TaskContext::goto_trap_return(kernel_stack_top),
+                    task_status: TaskStatus::Ready,
+                    memory_set,
+                    parent: None,
+                    children: Vec::new(),
+                    exit_code: 0,
+                    heap_bottom: user_sp,
+                    program_brk: user_sp,
+                    syscall_times: [0; MAX_SYSCALL_NUM],
+                    start_time: 0,
+                    stride: Stride(0),
+                    pass: DEFAULT_PASS,
+                })
+            },
+        });
+        // add child
+        parent_inner.children.push(new_task.clone());
+        // modify kernel_sp in trap_cx
+        // **** access child PCB exclusively
+        let trap_cx = new_task.inner_exclusive_access().get_trap_cx();
+        *trap_cx = TrapContext::app_init_context(
+            entry_point,
+            user_sp,
+            KERNEL_SPACE.exclusive_access().token(),
+            self.kernel_stack.get_top(),
+            trap_handler as usize,
+        );
+        add_task(new_task.clone());
+        new_task.pid.0 as isize
+    }
+
     /// parent process fork the child process
     pub fn fork(self: &Arc<Self>) -> Arc<Self> {
         // ---- access parent PCB exclusively
@@ -208,7 +294,9 @@ impl TaskControlBlock {
                     heap_bottom: parent_inner.heap_bottom,
                     program_brk: parent_inner.program_brk,
                     syscall_times: [0; MAX_SYSCALL_NUM],
-                    start_time: get_time_us(),
+                    start_time: 0,
+                    stride: Stride(0),
+                    pass: DEFAULT_PASS,
                 })
             },
         });
@@ -227,6 +315,18 @@ impl TaskControlBlock {
     /// get pid of process
     pub fn getpid(&self) -> usize {
         self.pid.0
+    }
+
+    /// change priority
+    pub fn change_priority(&self, priority: u32) {
+        let mut inner = self.inner_exclusive_access();
+        inner.pass = (BIG_STRIDE / priority) as u32;
+    }
+
+    /// increment stride
+    pub fn inc_stride(&self) {
+        let mut inner = self.inner_exclusive_access();
+        inner.stride.0 = (inner.pass as i32 + inner.stride.0 as i32) as u32;
     }
 
     /// change the location of the program break. return None if failed.
