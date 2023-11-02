@@ -252,9 +252,9 @@ pub fn sys_spawn(_path: *const u8) -> isize {
     );
     let token = current_user_token();
     let path = translated_str(token, _path);
-    if let Some(elf_data) = get_app_data_by_name(path.as_str()) {
+    if let Some(elf_data) = open_file(path.as_str(), OpenFlags::RDONLY) {
         let current_task = current_task().unwrap();
-        current_task.spawn(elf_data)
+        current_task.spawn(elf_data.read_all().as_slice())
     } else {
         //无效的文件名
         -1
