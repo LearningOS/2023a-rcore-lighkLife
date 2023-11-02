@@ -70,6 +70,25 @@ pub fn list_apps() {
     println!("**************/");
 }
 
+/// create a file link relative to directory file descriptors
+pub fn link_at(old_name: &str, new_name : &str) -> isize {
+    return if let Some(inode) = ROOT_INODE.find(old_name) {
+        inode.linkat(old_name, new_name)
+    } else {
+        -1
+    }
+}
+
+/// create a file link relative to directory file descriptors
+pub fn unlink_at(name: &str) -> isize {
+    return if let Some(inode) = ROOT_INODE.find(name) {
+        inode.unlinkat(name)
+    } else {
+        -1
+    }
+}
+
+
 bitflags! {
     ///  The flags argument to the open() system call is constructed by ORing together zero or more of the following values:
     pub struct OpenFlags: u32 {

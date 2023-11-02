@@ -356,7 +356,7 @@ impl TaskControlBlock {
     /// change priority
     pub fn change_priority(&self, priority: u32) {
         let mut inner = self.inner_exclusive_access();
-        inner.pass = (BIG_STRIDE / priority) as u32;
+        inner.pass = BIG_STRIDE / priority;
     }
 
     /// increment stride

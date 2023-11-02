@@ -138,7 +138,7 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
 
 /// write value to the virtual address
 fn write<T: Sized>(virt_addr: VirtAddr, value: T) {
-    let task =  current_task().unwrap();
+    let task = current_task().unwrap();
     let task = task.inner_exclusive_access();
     let ppn = task.memory_set.translate(virt_addr.floor()).unwrap();
     let page = ppn.ppn().get_bytes_array();
@@ -171,7 +171,7 @@ pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
         "kernel:pid[{}] sys_task_info",
         current_task().unwrap().pid.0
     );
-    let task =  current_task().unwrap();
+    let task = current_task().unwrap();
     let task = task.inner_exclusive_access();
     let syscall_times = &mut [0; MAX_SYSCALL_NUM];
     syscall_times.copy_from_slice(task.get_syscall_times());
@@ -211,7 +211,7 @@ pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
     if perm.is_none() {
         return -1;
     }
-    let task =  current_task().unwrap();
+    let task = current_task().unwrap();
     let mut task = task.inner_exclusive_access();
     task.memory_set.mmap(start_addr, end_addr, perm.unwrap())
 }
@@ -228,7 +228,7 @@ pub fn sys_munmap(_start: usize, _len: usize) -> isize {
     }
     let start_addr = VirtAddr::from(_start);
     let end_addr = VirtAddr::from(_start + _len);
-    let task =  current_task().unwrap();
+    let task = current_task().unwrap();
     let mut task = task.inner_exclusive_access();
     task.memory_set.unmmap(start_addr, end_addr)
 }
