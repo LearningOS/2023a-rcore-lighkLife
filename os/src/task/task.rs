@@ -362,7 +362,7 @@ impl TaskControlBlock {
     /// increment stride
     pub fn inc_stride(&self) {
         let mut inner = self.inner_exclusive_access();
-        inner.stride.0 = (inner.pass as i32 + inner.stride.0 as i32) as u32;
+        inner.stride.0 = (inner.pass as i32 + inner.stride.0 as i32) as u64;
     }
 
     /// change the location of the program break. return None if failed.
