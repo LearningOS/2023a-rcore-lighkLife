@@ -92,11 +92,11 @@ pub struct TaskControlBlockInner {
 }
 
 #[derive(Ord, Eq, Copy, Clone, Debug)]
-pub struct Stride(u32);
+pub struct Stride(u64);
 
 impl PartialOrd for Stride {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        let diff = (self.0 as i32 - other.0 as i32) as u32;
+        let diff = (self.0 as i32 - other.0 as i32) as u64;
         return if diff == 0 {
             Some(Equal)
         } else if diff > 0 {

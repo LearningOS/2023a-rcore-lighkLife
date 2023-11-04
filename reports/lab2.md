@@ -64,9 +64,10 @@ stval: trap 发生进入S态时会将异常信息写入，用于帮助处理 tra
 双页表实现下用户程序和内核转换时、用户程序转换时都需要更换页表，而对于单页表操作系统，不同用户线程切换时需要更换页表。
 ## 荣誉准则
 
-1. 在完成本次实验的过程（含此前学习的过程）中，我曾分别与 以下各位 就（与本次实验相关的）以下方面做过交流，
+1. 在完成本次实验的过程（含此前学习的过程）中，我曾分别与 以下各位 就（与本次实验相关的）以下方面做过交流，<br>
+   无 <br>
    还在代码中对应的位置以注释形式记录了具体的交流对象及内容：<br>
-   无
+   无 <br>
 2. 此外，我也参考了 以下资料 ，还在代码中对应的位置以注释形式记录了具体的参考来源及内容：<br>
    [1] [rCore-Tutorial-Book 第三版](https://rcore-os.cn/rCore-Tutorial-Book-v3/index.html)<br>
    [2] [How to convert 'struct' to '&[u8]'?](https://stackoverflow.com/questions/28127165/how-to-convert-struct-to-u8)<br>

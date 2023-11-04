@@ -137,7 +137,7 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
 }
 
 /// write value to the virtual address
-fn write<T: Sized>(virt_addr: VirtAddr, value: T) {
+pub fn write<T: Sized>(virt_addr: VirtAddr, value: T) {
     let task = current_task().unwrap();
     let task = task.inner_exclusive_access();
     let ppn = task.memory_set.translate(virt_addr.floor()).unwrap();

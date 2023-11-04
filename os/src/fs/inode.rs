@@ -4,15 +4,19 @@
 //!
 //! `UPSafeCell<OSInodeInner>` -> `OSInode`: for static `ROOT_INODE`,we
 //! need to wrap `OSInodeInner` into `UPSafeCell`
-use super::File;
-use crate::drivers::BLOCK_DEVICE;
-use crate::mm::UserBuffer;
-use crate::sync::UPSafeCell;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use core::any::Any;
+
 use bitflags::*;
 use easy_fs::{EasyFileSystem, Inode};
 use lazy_static::*;
+
+use crate::drivers::BLOCK_DEVICE;
+use crate::mm::UserBuffer;
+use crate::sync::UPSafeCell;
+
+use super::File;
 
 /// inode in memory
 /// A wrapper around a filesystem inode
@@ -22,6 +26,7 @@ pub struct OSInode {
     writable: bool,
     inner: UPSafeCell<OSInodeInner>,
 }
+
 /// The OS inode inner in 'UPSafeCell'
 pub struct OSInodeInner {
     offset: usize,
@@ -37,6 +42,12 @@ impl OSInode {
             inner: unsafe { UPSafeCell::new(OSInodeInner { offset: 0, inode }) },
         }
     }
+    /// stat
+    pub fn stat(&self) -> (bool, u32, u32) {
+        let inner = self.inner.exclusive_access();
+        stat(inner.inode.clone())
+    }
+
     /// read all data from the inode
     pub fn read_all(&self) -> Vec<u8> {
         let mut inner = self.inner.exclusive_access();
@@ -70,22 +81,21 @@ pub fn list_apps() {
     println!("**************/");
 }
 
-/// create a file link relative to directory file descriptors
-pub fn link_at(old_name: &str, new_name : &str) -> isize {
-    return if let Some(inode) = ROOT_INODE.find(old_name) {
-        inode.linkat(old_name, new_name)
-    } else {
-        -1
-    }
+
+/// read file stat
+pub fn stat(inode: Arc<Inode>) -> (bool, u32, u32) {
+    ROOT_INODE.stat(inode)
 }
 
 /// create a file link relative to directory file descriptors
+pub fn link_at(old_name: &str, new_name: &str) -> isize {
+    ROOT_INODE.linkat(old_name, new_name)
+}
+
+
+/// create a file link relative to directory file descriptors
 pub fn unlink_at(name: &str) -> isize {
-    return if let Some(inode) = ROOT_INODE.find(name) {
-        inode.unlinkat(name)
-    } else {
-        -1
-    }
+    ROOT_INODE.unlinkat(name)
 }
 
 
@@ -173,5 +183,8 @@ impl File for OSInode {
             total_write_size += write_size;
         }
         total_write_size
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }

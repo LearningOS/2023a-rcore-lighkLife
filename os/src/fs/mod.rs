@@ -1,9 +1,14 @@
 //! File trait & inode(dir, file, pipe, stdin, stdout)
 
-mod inode;
-mod stdio;
+use core::any::Any;
+
+pub use inode::{link_at, list_apps, open_file, OpenFlags, OSInode, unlink_at};
+pub use stdio::{Stdin, Stdout};
 
 use crate::mm::UserBuffer;
+
+mod inode;
+mod stdio;
 
 /// trait File for all file types
 pub trait File: Send + Sync {
@@ -15,7 +20,10 @@ pub trait File: Send + Sync {
     fn read(&self, buf: UserBuffer) -> usize;
     /// write to the file from buf, return the number of bytes written
     fn write(&self, buf: UserBuffer) -> usize;
+    /// for cast type
+    fn as_any(&self) -> &dyn Any;
 }
+
 
 /// The stat of a inode
 #[repr(C)]
@@ -33,6 +41,23 @@ pub struct Stat {
     pad: [u64; 7],
 }
 
+impl Stat {
+    /// create Stat
+    pub fn new(inode_id: u32, link_count: u32, is_file: bool) -> Self {
+        let mode = match is_file {
+            true => StatMode::FILE,
+            false => StatMode::DIR
+        };
+        Stat {
+            dev: 0,
+            ino: inode_id as u64,
+            mode,
+            nlink: link_count,
+            pad: [0; 7],
+        }
+    }
+}
+
 bitflags! {
     /// The mode of a inode
     /// whether a directory or a file
@@ -46,5 +71,3 @@ bitflags! {
     }
 }
 
-pub use inode::{list_apps, open_file, link_at, unlink_at, OSInode, OpenFlags};
-pub use stdio::{Stdin, Stdout};
